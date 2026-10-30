@@ -1,0 +1,137 @@
+{
+  "name": "كهرمان: ماسنجر المهدوي للعبايات (تجربة)",
+  "nodes": [
+    {
+      "id": "d7049c67-ab5a-486f-8ff5-c835ccb9b65f",
+      "name": "Meta Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "1b4d1c2c-ff4f-43a1-b931-d55bb4fd38b5",
+      "parameters": {
+        "multipleMethods": true,
+        "httpMethod": [
+          "GET",
+          "POST"
+        ],
+        "path": "meta",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "ed709504-3677-4916-84f6-76a54479fecc",
+      "name": "Verify (GET)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        80
+      ],
+      "notes": "The owner replaces CHANGE_ME with his own verify word, the same word he types in the Meta app. The word is never committed.",
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query['hub.mode'] === 'subscribe' && $json.query['hub.verify_token'] === 'CHANGE_ME' ? $json.query['hub.challenge'] : 'forbidden' }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "77949011-033c-4808-aec8-18ff3e7f84d0",
+      "name": "OK to Meta (POST)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        320
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "EVENT_RECEIVED",
+        "options": {}
+      }
+    },
+    {
+      "id": "153afae2-b74a-4caa-8eed-d57859cc36df",
+      "name": "Customer messages",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        320
+      ],
+      "parameters": {
+        "jsCode": "// Plan v2 م4 step 57: keep only text messages that customers send to المهدوي للعبايات.\n// Other pages, echoes of our own replies, and non-text events are ignored.\nconst PAGE_ID = '110250908003364';\nconst out = [];\nfor (const item of $input.all()) {\n  const body = item.json.body || {};\n  if (body.object !== 'page') continue;\n  for (const entry of body.entry || []) {\n    if (String(entry.id) !== PAGE_ID) continue;\n    for (const ev of entry.messaging || []) {\n      const m = ev.message;\n      if (!m || m.is_echo || !m.text) continue;\n      out.push({ json: { psid: ev.sender.id, text: m.text, mid: m.mid, page_id: PAGE_ID } });\n    }\n  }\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "bec1d80c-b307-4352-824f-19da7c60a666",
+      "name": "Reply on Messenger",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        780,
+        320
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v23.0/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ recipient: { id: $json.psid }, messaging_type: 'RESPONSE', message: { text: 'أهلاً 👋 هذا رد تجريبي من كهرمان. وصلتنا رسالتك: «' + $json.text + '»' } }) }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Meta Webhook": {
+      "main": [
+        [
+          {
+            "node": "Verify (GET)",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OK to Meta (POST)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OK to Meta (POST)": {
+      "main": [
+        [
+          {
+            "node": "Customer messages",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Customer messages": {
+      "main": [
+        [
+          {
+            "node": "Reply on Messenger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Africa/Tripoli"
+  },
+  "pinData": {}
+}
