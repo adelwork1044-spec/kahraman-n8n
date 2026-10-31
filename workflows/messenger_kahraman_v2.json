@@ -1,0 +1,210 @@
+{
+  "name": "كهرمان: ماسنجر ← البوت ← رد",
+  "nodes": [
+    {
+      "id": "e7e4fec0-c69a-4d09-b87d-a1d0eef6f236",
+      "name": "Meta Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "2ac74229-119f-4574-a38d-1975a51682f9",
+      "parameters": {
+        "multipleMethods": true,
+        "httpMethod": [
+          "GET",
+          "POST"
+        ],
+        "path": "meta",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "ce58dfa6-58af-480f-8315-b34c51d2284d",
+      "name": "اكتب كلمة التحقق هنا",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        260,
+        80
+      ],
+      "notes": "The owner replaces CHANGE_ME with his own verify word (the same word he types in the Meta app). It is never committed.",
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "0de9e046-c6a8-4b93-ac82-fb06d6740778",
+              "name": "verify_word",
+              "value": "CHANGE_ME",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "aeb2be54-ef17-461c-8b8b-58251a4f1ad8",
+      "name": "Verify (GET)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        520,
+        80
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query['hub.mode'] === 'subscribe' && $json.verify_word !== 'CHANGE_ME' && $json.query['hub.verify_token'] === $json.verify_word ? $json.query['hub.challenge'] : 'forbidden' }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "0e00b8a2-9af4-46ac-ad4a-576991d9eaa5",
+      "name": "OK to Meta (POST)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        320
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "EVENT_RECEIVED",
+        "options": {}
+      }
+    },
+    {
+      "id": "2f8ef8ae-ffa2-42dd-a600-711f51f1a99f",
+      "name": "Ask Kahraman (bot)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        520,
+        320
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 3000,
+      "notes": "Hands Meta's message to the bot; the bot decides and returns the replies. Key: /n8n_link in Telegram.",
+      "parameters": {
+        "method": "POST",
+        "url": "https://kahraman-bot.onrender.com/api/kahraman/meta",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify($json.body) }}",
+        "options": {
+          "timeout": 30000
+        }
+      }
+    },
+    {
+      "id": "872886e1-e4a2-4d91-be78-5e940e5f0af4",
+      "name": "Replies",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        780,
+        320
+      ],
+      "parameters": {
+        "jsCode": "// One item per reply the bot asked us to send (none for a repeated message).\nreturn ($input.first().json.replies || []).map(r => ({ json: r }));"
+      }
+    },
+    {
+      "id": "2ddf6b78-cb13-40a1-89d6-72af76ed9c4a",
+      "name": "Reply on Messenger",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1040,
+        320
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v23.0/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ recipient: { id: $json.user_id }, messaging_type: 'RESPONSE', message: { text: $json.text } }) }}",
+        "options": {}
+      }
+    }
+  ],
+  "connections": {
+    "Meta Webhook": {
+      "main": [
+        [
+          {
+            "node": "اكتب كلمة التحقق هنا",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OK to Meta (POST)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "اكتب كلمة التحقق هنا": {
+      "main": [
+        [
+          {
+            "node": "Verify (GET)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OK to Meta (POST)": {
+      "main": [
+        [
+          {
+            "node": "Ask Kahraman (bot)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Kahraman (bot)": {
+      "main": [
+        [
+          {
+            "node": "Replies",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replies": {
+      "main": [
+        [
+          {
+            "node": "Reply on Messenger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Africa/Tripoli"
+  },
+  "pinData": {}
+}
