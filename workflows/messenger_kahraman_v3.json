@@ -1,0 +1,325 @@
+{
+  "name": "كهرمان: ماسنجر ← البوت ← رد (مع طابور)",
+  "nodes": [
+    {
+      "id": "12885d22-27e9-4e9f-aad7-a981a38427ee",
+      "name": "Meta Webhook",
+      "type": "n8n-nodes-base.webhook",
+      "typeVersion": 2,
+      "position": [
+        0,
+        200
+      ],
+      "webhookId": "9a691a92-f980-4b6d-a6e8-81b4116de324",
+      "parameters": {
+        "multipleMethods": true,
+        "httpMethod": [
+          "GET",
+          "POST"
+        ],
+        "path": "meta",
+        "responseMode": "responseNode",
+        "options": {}
+      }
+    },
+    {
+      "id": "f0ed1042-0c8f-421a-8e61-4e2fad49b1d2",
+      "name": "اكتب كلمة التحقق هنا",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        260,
+        80
+      ],
+      "notes": "The owner replaces CHANGE_ME with his own verify word (the same word he types in the Meta app). It is never committed.",
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "cc302ca2-61c6-486b-84c8-c7ba136545da",
+              "name": "verify_word",
+              "value": "CHANGE_ME",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      }
+    },
+    {
+      "id": "0483f2fa-8c91-4ce8-b400-bf47001d3724",
+      "name": "Verify (GET)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        520,
+        80
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "={{ $json.query['hub.mode'] === 'subscribe' && $json.verify_word !== 'CHANGE_ME' && $json.query['hub.verify_token'] === $json.verify_word ? $json.query['hub.challenge'] : 'forbidden' }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "f172da33-96e9-4b85-90cf-0332041e2dc5",
+      "name": "OK to Meta (POST)",
+      "type": "n8n-nodes-base.respondToWebhook",
+      "typeVersion": 1.1,
+      "position": [
+        260,
+        320
+      ],
+      "parameters": {
+        "respondWith": "text",
+        "responseBody": "EVENT_RECEIVED",
+        "options": {}
+      }
+    },
+    {
+      "id": "47817a3b-4aa6-4aa5-9113-7e7b90b3ce30",
+      "name": "Prepare",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        520,
+        320
+      ],
+      "notes": "The message from Meta (first time) or from the waiting line (later tries).",
+      "parameters": {
+        "jsCode": "// First time: the item from Meta. Later: the same message coming back from 'Wait'.\nreturn $input.all().map(i => ({ json: {\n  body: i.json.body,\n  attempt: i.json.attempt || 0,\n  delayed: !!i.json.delayed,\n  first_failed_at: i.json.first_failed_at || null,\n} }));"
+      }
+    },
+    {
+      "id": "f7c83a86-c926-46d5-9402-74486214fd8d",
+      "name": "Ask Kahraman (bot)",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        780,
+        320
+      ],
+      "retryOnFail": true,
+      "maxTries": 3,
+      "waitBetweenTries": 5000,
+      "notes": "Hands Meta's message to the bot; the bot decides and returns the replies. Key: /n8n_link in Telegram. If the bot does not answer, the message goes to the waiting line (lower path). Test: the message «تجربة الطابور» goes to a wrong address the first time on purpose, so the waiting line can be seen working without stopping the bot.",
+      "parameters": {
+        "method": "POST",
+        "url": "={{ $json.attempt === 0 && String($json.body?.entry?.[0]?.messaging?.[0]?.message?.text || '').trim() === 'تجربة الطابور' ? 'https://kahraman-bot.onrender.com/api/kahraman/queue-test' : 'https://kahraman-bot.onrender.com/api/kahraman/meta' }}",
+        "authentication": "genericCredentialType",
+        "genericAuthType": "httpHeaderAuth",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ body: $json.body, delayed: $json.delayed, attempt: $json.attempt }) }}",
+        "options": {
+          "timeout": 30000
+        }
+      },
+      "onError": "continueErrorOutput"
+    },
+    {
+      "id": "df9006de-26aa-48cd-a437-24860975ea11",
+      "name": "Replies",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        240
+      ],
+      "parameters": {
+        "jsCode": "// One item per reply the bot asked us to send (none for a repeated message).\nreturn ($input.first().json.replies || []).map(r => ({ json: r }));"
+      }
+    },
+    {
+      "id": "d23e2943-e4b2-429e-9306-de97bcd191f0",
+      "name": "Reply on Messenger",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        1300,
+        320
+      ],
+      "parameters": {
+        "method": "POST",
+        "url": "https://graph.facebook.com/v23.0/me/messages",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "sendBody": true,
+        "specifyBody": "json",
+        "jsonBody": "={{ JSON.stringify({ recipient: { id: $json.user_id }, messaging_type: 'RESPONSE', message: { text: $json.text } }) }}",
+        "options": {}
+      }
+    },
+    {
+      "id": "55900481-1aad-4439-86e8-aed730d1877f",
+      "name": "Waiting line (bot down)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1040,
+        460
+      ],
+      "notes": "Step 63: the bot did not answer. Keep the message and try again later (about 16 hours, while Meta still lets the page answer).",
+      "parameters": {
+        "jsCode": "// Minutes to wait before each new try (about 16 hours in all).\nconst WAITS = [1, 2, 5, 10, 15, 30, 30, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60, 60];\nconst out = [];\nfor (const i of $input.all()) {\n  const attempt = i.json.attempt || 0;\n  if (attempt >= WAITS.length) continue; // too late: Meta no longer lets the page answer\n  out.push({ json: {\n    body: i.json.body,\n    attempt: attempt + 1,\n    delayed: true,\n    first_failed_at: i.json.first_failed_at || new Date().toISOString(),\n    wait_minutes: WAITS[attempt],\n    polite: attempt === 0,\n  } });\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "cec23d5c-ab6c-42c2-8ec3-8d1a07da5704",
+      "name": "Polite reply (first time)",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        1300,
+        560
+      ],
+      "notes": "Only المهدوي للعبايات for now (the page Kahraman answers); other pages are added with their own page key.",
+      "parameters": {
+        "jsCode": "// Once per customer, the first time only, on the page Kahraman answers.\nconst PAGE = '110250908003364';\nconst TEXT = \"أهلاً 🌸 وصلتنا رسالتك، شوية ونردّو عليك إن شاء الله.\";\nconst seen = new Set();\nconst out = [];\nfor (const i of $input.all()) {\n  if (!i.json.polite) continue;\n  for (const e of (i.json.body?.entry || [])) {\n    if (String(e.id) !== PAGE) continue;\n    for (const m of (e.messaging || [])) {\n      const id = m.sender?.id;\n      if (!m.message || m.message.is_echo || !id || id === PAGE || seen.has(id)) continue;\n      seen.add(id);\n      out.push({ json: { user_id: id, text: TEXT } });\n    }\n  }\n}\nreturn out;"
+      }
+    },
+    {
+      "id": "12573c26-8197-4fb4-8bde-c4e4fbf3919f",
+      "name": "Wait",
+      "type": "n8n-nodes-base.wait",
+      "typeVersion": 1.1,
+      "position": [
+        1300,
+        760
+      ],
+      "webhookId": "c8b73701-4a7c-4451-9263-4381539e29bb",
+      "parameters": {
+        "resume": "timeInterval",
+        "amount": "={{ $json.wait_minutes }}",
+        "unit": "minutes"
+      }
+    }
+  ],
+  "connections": {
+    "Meta Webhook": {
+      "main": [
+        [
+          {
+            "node": "اكتب كلمة التحقق هنا",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "OK to Meta (POST)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "اكتب كلمة التحقق هنا": {
+      "main": [
+        [
+          {
+            "node": "Verify (GET)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "OK to Meta (POST)": {
+      "main": [
+        [
+          {
+            "node": "Prepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Prepare": {
+      "main": [
+        [
+          {
+            "node": "Ask Kahraman (bot)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Ask Kahraman (bot)": {
+      "main": [
+        [
+          {
+            "node": "Replies",
+            "type": "main",
+            "index": 0
+          }
+        ],
+        [
+          {
+            "node": "Waiting line (bot down)",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Replies": {
+      "main": [
+        [
+          {
+            "node": "Reply on Messenger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Waiting line (bot down)": {
+      "main": [
+        [
+          {
+            "node": "Polite reply (first time)",
+            "type": "main",
+            "index": 0
+          },
+          {
+            "node": "Wait",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Polite reply (first time)": {
+      "main": [
+        [
+          {
+            "node": "Reply on Messenger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Wait": {
+      "main": [
+        [
+          {
+            "node": "Prepare",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Africa/Tripoli"
+  },
+  "pinData": {}
+}
