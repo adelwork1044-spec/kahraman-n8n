@@ -23,18 +23,43 @@
       }
     },
     {
+      "id": "06ed272c-1345-426a-a21e-142d90891251",
+      "name": "اكتب كلمة التحقق هنا",
+      "type": "n8n-nodes-base.set",
+      "typeVersion": 3.4,
+      "position": [
+        260,
+        80
+      ],
+      "notes": "The owner replaces CHANGE_ME with his own verify word (the same word he types in the Meta app). It is never committed.",
+      "parameters": {
+        "mode": "manual",
+        "assignments": {
+          "assignments": [
+            {
+              "id": "4b9c6f27-c3c3-4398-966e-ccbc65cb4629",
+              "name": "verify_word",
+              "value": "CHANGE_ME",
+              "type": "string"
+            }
+          ]
+        },
+        "includeOtherFields": true,
+        "options": {}
+      }
+    },
+    {
       "id": "ed709504-3677-4916-84f6-76a54479fecc",
       "name": "Verify (GET)",
       "type": "n8n-nodes-base.respondToWebhook",
       "typeVersion": 1.1,
       "position": [
-        260,
+        520,
         80
       ],
-      "notes": "The owner replaces CHANGE_ME with his own verify word, the same word he types in the Meta app. The word is never committed.",
       "parameters": {
         "respondWith": "text",
-        "responseBody": "={{ $json.query['hub.mode'] === 'subscribe' && $json.query['hub.verify_token'] === 'CHANGE_ME' ? $json.query['hub.challenge'] : 'forbidden' }}",
+        "responseBody": "={{ $json.query['hub.mode'] === 'subscribe' && $json.verify_word !== 'CHANGE_ME' && $json.query['hub.verify_token'] === $json.verify_word ? $json.query['hub.challenge'] : 'forbidden' }}",
         "options": {}
       }
     },
@@ -92,7 +117,7 @@
       "main": [
         [
           {
-            "node": "Verify (GET)",
+            "node": "اكتب كلمة التحقق هنا",
             "type": "main",
             "index": 0
           }
@@ -122,6 +147,17 @@
         [
           {
             "node": "Reply on Messenger",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "اكتب كلمة التحقق هنا": {
+      "main": [
+        [
+          {
+            "node": "Verify (GET)",
             "type": "main",
             "index": 0
           }
