@@ -47,6 +47,13 @@ services:
         value: "168"
       - key: DB_SQLITE_VACUUM_ON_STARTUP
         value: "true"
-      # Leave room under 512 MB.
+      # Memory under 512 MB (the service ran out once, 2026-10-31). n8n itself and the
+      # Code-node runner (a second Node process) share the 512 MB, so both get a cap:
+      # main 300 + runner 96 + Node's own overhead stays under the limit.
       - key: NODE_OPTIONS
-        value: --max-old-space-size=384
+        value: --max-old-space-size=300
+      - key: N8N_RUNNERS_MAX_OLD_SPACE_SIZE
+        value: "96"
+      # Our Code nodes are tiny; two at a time is plenty and keeps the runner small.
+      - key: N8N_RUNNERS_MAX_CONCURRENCY
+        value: "2"
