@@ -1,0 +1,120 @@
+{
+  "name": "كهرمان: جلب المحادثات القديمة (بدون أسماء)",
+  "nodes": [
+    {
+      "parameters": {},
+      "id": "29a82e37-5050-4659-b22d-97bffb9e825b",
+      "name": "Start",
+      "type": "n8n-nodes-base.manualTrigger",
+      "typeVersion": 1,
+      "position": [
+        0,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "url": "https://graph.facebook.com/v23.0/me/conversations?platform=messenger&limit=25&fields=messages.limit(20)%7Bmessage%2Cfrom%2Ccreated_time%7D",
+        "authentication": "predefinedCredentialType",
+        "nodeCredentialType": "facebookGraphApi",
+        "options": {
+          "pagination": {
+            "pagination": {
+              "paginationMode": "responseContainsNextURL",
+              "nextURL": "={{ $response.body.paging.next }}",
+              "paginationCompleteWhen": "other",
+              "completeExpression": "={{ !$response.body.paging || !$response.body.paging.next }}",
+              "limitPagesFetched": true,
+              "maxRequests": 40,
+              "requestInterval": 500
+            }
+          }
+        }
+      },
+      "id": "e0894a6c-9b38-4486-844e-dcfaefb5e744",
+      "name": "Get old chats",
+      "type": "n8n-nodes-base.httpRequest",
+      "typeVersion": 4.2,
+      "position": [
+        240,
+        0
+      ],
+      "credentials": {
+        "facebookGraphApi": {
+          "id": null,
+          "name": "Facebook Graph account 2"
+        }
+      }
+    },
+    {
+      "parameters": {
+        "jsCode": "// One file of the page's old chats, with no customer name, id, phone, email or link (plan v2 م6 step 87).\nconst PAGE_IDS = [\"110250908003364\"]; // المهدوي للعبايات\nconst hide = (t) => String(t || \"\")\n  .replace(/https?:\\/\\/\\S+|www\\.\\S+/gi, \"[رابط]\")\n  .replace(/[\\w.+-]+@[\\w-]+\\.[\\w.]+/g, \"[إيميل]\")\n  .replace(/(?:\\+|00)?[0-9٠-٩][0-9٠-٩\\s\\-]{6,}[0-9٠-٩]/g, \"[رقم]\");\nconst chats = [];\nfor (const page of $input.all()) {\n  for (const c of (page.json.data || [])) {\n    const msgs = ((c.messages && c.messages.data) || [])\n      .filter((m) => m.message)\n      .map((m) => ({\n        who: m.from && PAGE_IDS.includes(String(m.from.id)) ? \"page\" : \"customer\",\n        text: hide(m.message),\n        day: String(m.created_time || \"\").slice(0, 10),\n      }))\n      .reverse(); // Meta sends newest first\n    if (msgs.length) chats.push({ n: chats.length + 1, messages: msgs });\n  }\n}\nconst all = chats.flatMap((c) => c.messages);\nreturn [{ json: {\n  page: \"PAGE_02\",\n  chats: chats.length,\n  messages: all.length,\n  from_customers: all.filter((m) => m.who === \"customer\").length,\n  from_page: all.filter((m) => m.who === \"page\").length,\n  note: \"no names, ids, phones, emails or links; at most the last 20 messages of each chat (Meta's limit)\",\n  conversations: chats,\n} }];\n"
+      },
+      "id": "dd7eb6a1-b087-4d8a-85c2-3ced3ef541b3",
+      "name": "Remove names",
+      "type": "n8n-nodes-base.code",
+      "typeVersion": 2,
+      "position": [
+        480,
+        0
+      ]
+    },
+    {
+      "parameters": {
+        "operation": "toJson",
+        "options": {
+          "fileName": "kahraman_old_chats_PAGE_02.json",
+          "format": true
+        }
+      },
+      "id": "e9ffa934-6795-4169-9768-ad8223359226",
+      "name": "Make file",
+      "type": "n8n-nodes-base.convertToFile",
+      "typeVersion": 1.1,
+      "position": [
+        720,
+        0
+      ]
+    }
+  ],
+  "connections": {
+    "Start": {
+      "main": [
+        [
+          {
+            "node": "Get old chats",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Get old chats": {
+      "main": [
+        [
+          {
+            "node": "Remove names",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    },
+    "Remove names": {
+      "main": [
+        [
+          {
+            "node": "Make file",
+            "type": "main",
+            "index": 0
+          }
+        ]
+      ]
+    }
+  },
+  "settings": {
+    "executionOrder": "v1",
+    "timezone": "Africa/Tripoli"
+  },
+  "pinData": {}
+}
