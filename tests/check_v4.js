@@ -56,4 +56,9 @@ assert.deepStrictEqual(wf.connections["Reply in order"].main[0][0].node, "One by
 const same = (a, b) => JSON.stringify(wf.nodes.find((n) => n.name === a).parameters) ===
   JSON.stringify(wf.nodes.find((n) => n.name === b).parameters);
 assert(same("Reply in order", "Reply on Messenger"), "both send the same way");
+// The file names the credentials (no ids, no secrets): n8n picks them by name on import.
+const cred = (name) => wf.nodes.find((n) => n.name === name).credentials;
+assert.deepStrictEqual(cred("Ask Kahraman (bot)"), { httpHeaderAuth: { id: null, name: "Header Auth account" } });
+for (const name of ["Reply on Messenger", "Reply in order"])
+  assert.deepStrictEqual(cred(name), { facebookGraphApi: { id: null, name: "Facebook Graph account 2" } });
 console.log(`OK: waiting line ends after ${(minutes / 60).toFixed(1)} hours`);

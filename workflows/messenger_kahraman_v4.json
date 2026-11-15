@@ -117,7 +117,13 @@
           "timeout": 30000
         }
       },
-      "onError": "continueErrorOutput"
+      "onError": "continueErrorOutput",
+      "credentials": {
+        "httpHeaderAuth": {
+          "id": null,
+          "name": "Header Auth account"
+        }
+      }
     },
     {
       "id": "df9006de-26aa-48cd-a437-24860975ea11",
@@ -150,6 +156,12 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ recipient: { id: $json.user_id }, messaging_type: 'RESPONSE', message: { text: $json.text } }) }}",
         "options": {}
+      },
+      "credentials": {
+        "facebookGraphApi": {
+          "id": null,
+          "name": "Facebook Graph account 2"
+        }
       }
     },
     {
@@ -228,6 +240,12 @@
         "specifyBody": "json",
         "jsonBody": "={{ JSON.stringify({ recipient: { id: $json.user_id }, messaging_type: 'RESPONSE', message: { text: $json.text } }) }}",
         "options": {}
+      },
+      "credentials": {
+        "facebookGraphApi": {
+          "id": null,
+          "name": "Facebook Graph account 2"
+        }
       }
     }
   ],
